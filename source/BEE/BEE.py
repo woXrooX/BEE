@@ -5,12 +5,13 @@ if __name__ != "__main__":
 		#### Defaults
 
 		def __init__(self):
-			self.routes = {
-				# "pattern" : {
-				# 	"handler_func": handler_func,
-				# 	"URL_params": URL_params
-				# }
-			}
+			self.routes = {}
+			# {
+			# 	"pattern" : {
+			# 		"handler_func": handler_func,
+			# 		"URL_params": URL_params
+			# 	}
+			# }
 
 		def __call__(self, environ, start_response):
 			environ_path = environ['PATH_INFO']
