@@ -1,2 +1,1 @@
-# BEE
-Back-End Engine
+# BEE - Back-End Engine
