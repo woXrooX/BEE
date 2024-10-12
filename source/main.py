@@ -1,9 +1,9 @@
-from BEE import BEE
+from BEE.BEE import BEE
 
 app = BEE()
 
 @app.route('/')
-def home(): return "Welcome to Back!"
+def home(): return "Welcome to BEE!"
 
 @app.route('/about')
-def about(): return "About Back"
+def about(): return "About BEE"
