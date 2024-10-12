@@ -1,6 +1,6 @@
 from BEE import BEE
 
-app = Back()
+app = BEE()
 
 @app.route('/')
 def home(): return "Welcome to Back!"
