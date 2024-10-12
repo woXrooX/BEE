@@ -9,5 +9,4 @@ def home(): return "Welcome to BEE!"
 def about(): return "About BEE"
 
 @app.route('/user/<username>/settings')
-def user_profile(username):
-	return f"<h1>user > {username} > settings</h1>"
+def user_profile(username): return f"user > {username} > settings"
