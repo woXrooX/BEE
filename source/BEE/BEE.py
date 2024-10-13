@@ -44,11 +44,11 @@ if __name__ != "__main__":
 
 		#### Decorators
 
-		def route(self, path, methods=["GET"]):
+		def route(self, path_pattern, methods=["GET"]):
 			def decorator(handler_func):
-				pattern, URL_params = self.compile_route_path_pattern(path)
+				compiled_pattern, URL_params = self.compile_route_path_pattern(path_pattern)
 
-				self.routes[pattern] = {
+				self.routes[compiled_pattern] = {
 					"handler_func": handler_func,
 					"URL_params": URL_params,
 					"methods": methods
