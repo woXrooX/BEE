@@ -2,11 +2,12 @@ from BEE.BEE import BEE
 
 app = BEE()
 
-@app.route('/')
+@app.route("/")
 def home(): return "Welcome to BEE!"
 
-@app.route('/about')
+@app.route("/about")
 def about(): return "About BEE"
 
-@app.route('/user/<username>/settings')
-def user_profile(username): return f"user > {username} > settings"
+@app.route("/user/<URL_param>", methods=["GET"])
+def user_profile(URL_param):
+	return f"URL_param: {URL_param}"
