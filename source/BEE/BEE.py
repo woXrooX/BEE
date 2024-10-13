@@ -26,7 +26,6 @@ if __name__ != "__main__":
 				match = route_key.match(PATH_INFO)
 
 				if match:
-					# Check if method allowed
 					if REQUEST_METHOD in route_val["methods"]:
 						if REQUEST_METHOD == "GET":
 							kwargs = dict(zip(route_val["URL_params"], match.groups()))
