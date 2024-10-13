@@ -7,7 +7,7 @@ if __name__ != "__main__":
 		def __init__(self):
 			self.routes = {}
 			# {
-			# 	"pattern" : {
+			# 	"compiled_path_pattern" : {
 			# 		"handler_func": handler_func,
 			# 		"URL_params": URL_params,
 			# 		"methods": ["GET", "POST"]
