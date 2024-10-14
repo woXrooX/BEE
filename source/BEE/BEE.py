@@ -1,10 +1,15 @@
 if __name__ != "__main__":
 	import re
+	import inspect
+	from functools import wraps
+
+	from python.libs.BEE.Request import Request
 
 	class BEE:
 		#### Defaults
 
 		def __init__(self):
+
 			self.routes = {}
 			# {
 			# 	"compiled_path_pattern" : {
@@ -15,24 +20,23 @@ if __name__ != "__main__":
 			# }
 
 		def __call__(self, environ, start_response):
-			PATH_INFO = environ["PATH_INFO"]
-			REQUEST_METHOD = environ["REQUEST_METHOD"]
+			request = Request(environ)
 
-			if REQUEST_METHOD not in ["GET", "POST"]:
+			if request.method not in ["GET", "POST"]:
 				start_response('405 Method Not Allowed', [('Content-Type', 'text/plain')])
 				return [b'405 Method Not Allowed']
 
 			for route_key, route_val in self.routes.items():
-				match = route_key.match(PATH_INFO)
+				match = route_key.match(request.path)
 
 				if match:
-					if REQUEST_METHOD in route_val["methods"]:
-						if REQUEST_METHOD == "GET":
+					if request.method in route_val["methods"]:
+						if request.method == "GET":
 							kwargs = dict(zip(route_val["URL_params"], match.groups()))
 							start_response('200 OK', [('Content-Type', 'text/html')])
-							return [route_val["handler_func"](**kwargs).encode()]
+							return [route_val["handler_func"](request=request, **kwargs).encode()]
 
-						elif REQUEST_METHOD == "POST":
+						elif request.method == "POST":
 							pass
 							# POST resp
 
@@ -45,17 +49,22 @@ if __name__ != "__main__":
 		#### Decorators
 
 		def route(self, path_pattern, methods=["GET"]):
-			def decorator(handler_func):
+			def decorator(func):
 				compiled_pattern, URL_params = self.compile_route_path_pattern(path_pattern)
 
+				@wraps(func)
+				def wrapper(request=None, **kwargs):
+					sig = inspect.signature(func)
+					if "request" in sig.parameters: return func(request, **kwargs)
+					else: return func(**kwargs)
+
 				self.routes[compiled_pattern] = {
-					"handler_func": handler_func,
+					"handler_func": wrapper,
 					"URL_params": URL_params,
 					"methods": methods
 				}
 
-				return handler_func
-
+				return wrapper
 			return decorator
 
 
