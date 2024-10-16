@@ -1,6 +1,6 @@
-from BEE.BEE import BEE
+from BEE.BEE import Core
 
-app = BEE()
+app = Core()
 
 @app.route("/")
 def home(): return "Welcome to BEE!"
