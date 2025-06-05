@@ -1,5 +1,6 @@
 main: clear
-	cd source && uwsgi --disable-logging --ini uWSGI.ini
+	python3 source/main.py
+	# cd source && uwsgi --disable-logging --ini uWSGI.ini
 
 clear:
 	clear
