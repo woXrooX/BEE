@@ -1,80 +1,45 @@
-if __name__ != "__main__":
-	import re
-	import inspect
-	from functools import wraps
+from wsgiref.simple_server import make_server
 
-	from python.libs.BEE.Request import Request
+from BEE.Request import Request
+from BEE.Response import Response
+from BEE.Router import Router
 
-	class BEE:
-		#### Defaults
+class BEE:
+	"""Back‑End Engine core object (WSGI‑callable + route registry)."""
 
-		def __init__(self):
+	def __init__(self):
+		self.router = Router()
 
-			self.routes = {}
-			# {
-			# 	"compiled_path_pattern" : {
-			# 		"handler_func": handler_func,
-			# 		"URL_params": URL_params,
-			# 		"methods": ["GET", "POST"]
-			# 	}
-			# }
+	def route(self, path: str, methods=("GET",)):
+		def decorator(func):
+			for m in methods: self.router.add(path, m.upper(), func)
+			return func
 
-		def __call__(self, environ, start_response):
-			request = Request(environ)
+		return decorator
 
-			if request.method not in ["GET", "POST"]:
-				start_response('405 Method Not Allowed', [('Content-Type', 'text/plain')])
-				return [b'405 Method Not Allowed']
+	def __call__(self, environ, start_response):
+		req = Request(environ)
 
-			for route_key, route_val in self.routes.items():
-				match = route_key.match(request.path)
+		handler, params = self.router.match(req.get_path(), req.get_method())
 
-				if match:
-					if request.method in route_val["methods"]:
-						if request.method == "GET":
-							kwargs = dict(zip(route_val["URL_params"], match.groups()))
-							start_response('200 OK', [('Content-Type', 'text/html')])
-							return [route_val["handler_func"](request=request, **kwargs).encode()]
+		if handler is None: return Response.not_found()(start_response)
 
-						elif request.method == "POST":
-							pass
-							# POST resp
+		# Handler may declare signature (req, **params) or (**params)
+		try: result = handler(req, **params)
+		except TypeError: result = handler(**params)
 
-			start_response('404 Not Found', [('Content-Type', 'text/plain')])
-			return [b'404 Not Found']
+		if isinstance(result, Response): return result(start_response)
 
+		if isinstance(result, tuple): status, headers, body = result
 
+		else:
+			status = "200 OK"
+			headers = [("Content-Type", "text/plain")]
+			body = result
 
+		return Response.generate_start_response(start_response, status, headers, body)
 
-		#### Decorators
-
-		def route(self, path_pattern, methods=["GET"]):
-			def decorator(func):
-				compiled_pattern, URL_params = self.compile_route_path_pattern(path_pattern)
-
-				@wraps(func)
-				def wrapper(request=None, **kwargs):
-					sig = inspect.signature(func)
-					if "request" in sig.parameters: return func(request, **kwargs)
-					else: return func(**kwargs)
-
-				self.routes[compiled_pattern] = {
-					"handler_func": wrapper,
-					"URL_params": URL_params,
-					"methods": methods
-				}
-
-				return wrapper
-			return decorator
-
-
-
-
-		#### Helpers
-
-		def compile_route_path_pattern(self, path):
-			param_pattern = r'<([^>]+)>'
-			URL_params = re.findall(param_pattern, path)
-			regex_pattern = re.sub(param_pattern, r'([^/]+)', path)
-			return re.compile(f"^{regex_pattern}$"), URL_params
-
+	def run(self, host="127.0.0.1", port=8000):
+		with make_server(host, port, self) as server:
+			print(f"BEE running on http://{host}:{port}")
+			server.serve_forever()

@@ -1,40 +1,64 @@
 from urllib.parse import parse_qs
-from http.cookies import SimpleCookie
+import json
 
 class Request:
+	########################### Object
+
+	########### APIs
+
 	def __init__(self, environ):
 		self.environ = environ
-		self.method = environ.get("REQUEST_METHOD", '')
-		self.path = environ.get("PATH_INFO", '')
-		self.query_string = environ.get("QUERY_STRING", '')
-		self.content_type = environ.get("CONTENT_TYPE", '')
-		self.content_length = int(environ.get("CONTENT_LENGTH", 0))
+		self.body = None
+		self.JSON = None
+		self.headers = None
 
+	# The URL path (``/user/42``).
+	def get_path(self): return self.environ.get("PATH_INFO", "/")
+
+	# Upper‑case HTTP verb (``GET``, ``POST``, …).
+	def get_method(self): return self.environ.get("REQUEST_METHOD", "GET").upper()
+
+	# Dict[str, List[str]] of query‑string params (``?a=1&a=2``).
+	def get_query(self): return parse_qs(self.environ.get("QUERY_STRING", ""), keep_blank_values=True)
+
+	# alias for convenience (Flask uses ``request.args``)
+	get_args = get_query
+
+	# Case‑title‑cased header mapping (``{"Content-Type": "…"}``).
 	def get_headers(self):
-		return {key[5:]: value for key, value in self.environ.items() if key.startswith('HTTP_')}
+		if self.headers is None:
+			headers = {}
 
+			for k, v in self.environ.items():
+				if k.startswith("HTTP_"):
+					name = k[5:].replace("_", "-").title()
+					headers[name] = v
+
+			for k in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+				if k in self.environ:
+					name = k.replace("_", "-").title()
+					headers[name] = self.environ[k]
+
+			self.headers = headers
+
+		return self.headers
+
+	# Raw request body *bytes* (read once then cached).
 	def get_body(self):
-		content_length = self.content_length
-		if content_length:
-			return self.environ['wsgi.input'].read(content_length)
-		return b''
+		if self.body is None:
+			try: length = int(self.environ.get("CONTENT_LENGTH", 0) or 0)
+			except ValueError: length = 0
 
-	def get_query_params(self):
-		return parse_qs(self.query_string)
+			self.body = self.environ["wsgi.input"].read(length)
 
-	def get_form_data(self):
-		if self.content_type == 'application/x-www-form-urlencoded':
-			return parse_qs(self.get_body().decode('utf-8'))
-		return {}
+		return self.body
 
-	def get_json(self):
-		if self.content_type == 'application/json':
-			import json
-			return json.loads(self.get_body().decode('utf-8'))
-		return None
+	# Parse body as JSON once and memoize result.
+	def get_JSON(self):
+		if self.JSON is None:
+			try: self.JSON = json.loads(self.body().decode() or "null")
+			except json.JSONDecodeError: self.JSON = None
 
-	def get_cookies(self):
-		cookie = SimpleCookie()
-		cookie.load(self.environ.get('HTTP_COOKIE', ''))
-		return {key: morsel.value for key, morsel in cookie.items()}
+		return self.JSON
 
+	########### Helpers
