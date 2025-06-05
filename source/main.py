@@ -1,13 +1,18 @@
-from BEE.BEE import Core
+from BEE.BEE import BEE
 
-app = Core()
+app = BEE()
 
 @app.route("/")
-def home(): return "Welcome to BEE!"
+def home():
+	return "Welcome to BEE!"
 
 @app.route("/about")
-def about(): return "About BEE"
+def about():
+	return "About BEE"
 
 @app.route("/user/<URL_param>", methods=["GET"])
 def user_profile(URL_param):
 	return f"URL_param: {URL_param}"
+
+if __name__ == "__main__":
+	app.run()
