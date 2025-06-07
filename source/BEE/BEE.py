@@ -1,41 +1,55 @@
 from wsgiref.simple_server import make_server
 
-from BEE.Request import Request
-from BEE.Response import Response
-from BEE.Router import Router
+from .Router import Router
+from .Request import Request
+from .Response import Response
+from .Sessions.Session_Manager import Session_Manager
+from .Sessions.Session_Proxy import Session_Proxy
 
 class BEE:
-	"""Back‑End Engine core object (WSGI‑callable + route registry)."""
-
-	def __init__(self):
+	# Back‑End Engine core object (WSGI‑callable + route registry).
+	def __init__(self, secret="BEE_dev"):
 		self.router = Router()
+		self.sessions = Session_Manager(secret)
 
 	def route(self, path: str, methods=("GET",)):
 		def decorator(func):
-			for m in methods: self.router.add(path, m.upper(), func)
+			for m in methods: self.router.register_route(path, m.upper(), func)
 			return func
 
 		return decorator
 
 	def __call__(self, environ, start_response):
-		req = Request(environ)
+		request = Request(environ)
+		session = self.sessions.load(environ)
+		token = Session_Proxy.bind(session)
 
-		handler, params = self.router.match(req.get_path(), req.get_method())
+		try:
+			# Enable if you want the session to be available on request as well
+			# request.session = session
 
-		if handler is None: return Response.not_found()(start_response)
+			handler, params = self.router.match(request.get_path(), request.get_method())
+			if handler is None: response = Response.not_found()
+			else:
+				# Handler may declare signature (request, **params) or (**params)
+				try: result = handler(request, **params)
+				except TypeError: result = handler(**params)
 
-		# Handler may declare signature (req, **params) or (**params)
-		try: result = handler(req, **params)
-		except TypeError: result = handler(**params)
+				# Normalize result into Response
+				if isinstance(result, Response): response = result
 
-		if isinstance(result, Response): return result(start_response)
+				elif isinstance(result, tuple):
+					status, headers, body = result
+					response = Response(body, status, headers)
 
-		if isinstance(result, tuple): status, headers, body = result
+				else: response = Response.ok(result)
 
-		else:
-			status = "200 OK"
-			headers = [("Content-Type", "text/plain")]
-			body = result
+			# persist session if needed
+			self.sessions.save(session, response)
+
+			return resp(start_response)
+
+		finally: Session_Proxy.unbind(token)
 
 		return Response.generate_start_response(start_response, status, headers, body)
 
