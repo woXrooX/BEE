@@ -1,6 +1,6 @@
 import uuid
 
-class Session(dict):
+class Sessions(dict):
 	########################### Object
 
 	def __init__(self, data=None, new=True, sid=None):

@@ -1,6 +1,6 @@
 import hmac, hashlib, base64, time
 
-from BEE.Session import Session
+from .Sessions import Sessions
 
 class Session_Manager:
 	########################### Static
