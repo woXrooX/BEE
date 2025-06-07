@@ -1,8 +1,11 @@
-import hmac, hashlib, base64, time, threading
+import hmac, hashlib, base64, json, time, threading, sqlite3, os, sys
 
 from .Sessions import Sessions
 
-# Single mutex shared by all Session_Manager instances
+# SQLite path
+BASE_DIR = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "sessions.sqlite3")
+
 THREADING_LOCK = threading.Lock()
 
 class Session_Manager:
@@ -17,16 +20,22 @@ class Session_Manager:
 
 	########### APIs
 
-	def __init__(self, secret: str):
-		self.secret = secret
+	def __init__(self, SECRET_KEY: str, SQLite_DB_PATH: str):
+		self.SECRET_KEY = SECRET_KEY
+		self.SQLite_DB_PATH = SQLite_DB_PATH or DEFAULT_DB_PATH
 
-		# in‑memory: sid → (expires_epoch, data_dict)
-		self.sessions = {}
+		# Single connection in autocommit mode; shared across threads with a mutex
+		self.db = sqlite3.connect(
+			self.SQLite_DB_PATH,
+			check_same_thread=False,
+			isolation_level=None
+		)
+
+		self.__SQLite_init_session_schema()
 
 	# Return a class "Sessions" extracted from the Cookie header.
 	def load(self, environ):
 		raw = environ.get("HTTP_COOKIE", "")
-
 		sid = None
 
 		for part in raw.split(";"):
@@ -41,19 +50,19 @@ class Session_Manager:
 		# no valid cookie → new session
 		if not sid: return Sessions()
 
-		### Critical section: access shared dict
-		with THREADING_LOCK: entry = self.sessions.get(sid)
+		with THREADING_LOCK: row = self.db.execute("SELECT expires, data FROM sessions WHERE sid=?;", (sid,)).fetchone()
 
-		# sid not found in store
-		if entry is None: return Sessions()
+		if row is None: return Sessions()
 
-		expires, data = entry
+		expires, data_json = row
 
 		# expired → purge & start fresh
 		if expires < time.time():
-			with THREADING_LOCK: self.sessions.pop(sid, None)
-
+			self.__SQLite_delete_session(sid)
 			return Sessions()
+
+		try: data = json.loads(data_json)
+		except json.JSONDecodeError: data = {}
 
 		return Sessions(data=data, new=False, sid=sid)
 
@@ -61,31 +70,36 @@ class Session_Manager:
 	def save(self, session: Sessions, response):
 		if not (session.new or session.modified): return
 
-		# persist to in‑memory store
 		expires = int(time.time()) + Session_Manager.MAX_AGE
+		payload = json.dumps(dict(session))
 
 		with THREADING_LOCK:
-			self.sessions[session.sid] = (expires, dict(session))
+			self.db.execute("INSERT OR REPLACE INTO sessions(sid, expires, data) VALUES (?,?,?);", (session.sid, expires, payload),)
 
-			# Garbage-collect stale sessions opportunistically
-			now = time.time()
-			for old_sid in list(self.sessions):
-				if self.sessions[old_sid][0] < now: del self.sessions[old_sid]
+			# opportunistic GC
+			self.db.execute("DELETE FROM sessions WHERE expires < ?;", (int(time.time()),),)
 
 		cookie_value = f"{session.sid}.{self.__sign(session.sid)}"
-
 		head_value = (
 			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly; "
-			f"Max-Age={Session_Manager.MAX_AGE}"
+			f"Max-Age={Session_Manager.MAX_AGE}; SameSite=Lax; Secure"
 		)
 
 		response.headers.append(("Set-Cookie", head_value))
 
 	########### Helpers
+	def __SQLite_init_session_schema(self):
+		with THREADING_LOCK:
+			self.db.execute("CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, expires INTEGER, data TEXT);")
+			self.db.execute("CREATE INDEX IF NOT EXISTS idx_expires ON sessions(expires);")
+
+	def __SQLite_delete_session(self, sid: str):
+		with THREADING_LOCK: self.db.execute("DELETE FROM sessions WHERE sid=?;", (sid,))
+
 
 	# Return URL‑safe base64 HMAC(signature) for *sid*.
 	def __sign(self, sid: str):
-		sig = hmac.new(self.secret.encode(), sid.encode(), hashlib.sha256).digest()
+		sig = hmac.new(self.SECRET_KEY.encode(), sid.encode(), hashlib.sha256).digest()
 		return base64.urlsafe_b64encode(sig).decode().rstrip("=")
 
 	# Return sid if signature is valid, else None
