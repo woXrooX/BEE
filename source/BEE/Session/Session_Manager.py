@@ -20,7 +20,7 @@ class Session_Manager:
 		# in‑memory: sid → (expires_epoch, data_dict)
 		self.sessions = {}
 
-	# Return a class "Session" extracted from the Cookie header.
+	# Return a class "Sessions" extracted from the Cookie header.
 	def load(self, environ):
 		raw = environ.get("HTTP_COOKIE", "")
 
@@ -35,19 +35,19 @@ class Session_Manager:
 				sid = self.__verify(v)
 				break
 
-		if not sid or sid not in self.sessions: return Session()
+		if not sid or sid not in self.sessions: return Sessions()
 
 		expires, data = self.sessions[sid]
 
 		# Expired in store (self.sessions)
 		if expires < time.time():
 			self.sessions.pop(sid, None)
-			return Session()
+			return Sessions()
 
-		return Session(data=data, new=False, sid=sid)
+		return Sessions(data=data, new=False, sid=sid)
 
 	# Persist *session* and attach Set‑Cookie header if needed.
-	def save(self, session: Session, response):
+	def save(self, session: Sessions, response):
 		if not (session.new or session.modified): return
 
 		# persist to in‑memory store
