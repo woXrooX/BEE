@@ -49,7 +49,7 @@ class BEE:
 
 				else: response = Response.ok(result)
 
-			# persist session if needed
+			# Persist session if needed
 			self.session_manager.save(session, response)
 
 			return response(start_response)
