@@ -1,6 +1,9 @@
-import hmac, hashlib, base64, time
+import hmac, hashlib, base64, time, threading
 
 from .Sessions import Sessions
+
+# Single mutex shared by all Session_Manager instances
+THREADING_LOCK = threading.Lock()
 
 class Session_Manager:
 	########################### Static
@@ -35,13 +38,21 @@ class Session_Manager:
 				sid = self.__verify(v)
 				break
 
-		if not sid or sid not in self.sessions: return Sessions()
+		# no valid cookie → new session
+		if not sid: return Sessions()
 
-		expires, data = self.sessions[sid]
+		### Critical section: access shared dict
+		with THREADING_LOCK: entry = self.sessions.get(sid)
 
-		# Expired in store (self.sessions)
+		# sid not found in store
+		if entry is None: return Sessions()
+
+		expires, data = entry
+
+		# expired → purge & start fresh
 		if expires < time.time():
-			self.sessions.pop(sid, None)
+			with THREADING_LOCK: self.sessions.pop(sid, None)
+
 			return Sessions()
 
 		return Sessions(data=data, new=False, sid=sid)
@@ -52,7 +63,14 @@ class Session_Manager:
 
 		# persist to in‑memory store
 		expires = int(time.time()) + Session_Manager.MAX_AGE
-		self.sessions[session.sid] = (expires, dict(session))
+
+		with THREADING_LOCK:
+			self.sessions[session.sid] = (expires, dict(session))
+
+			# Garbage-collect stale sessions opportunistically
+			now = time.time()
+			for old_sid in list(self.sessions):
+				if self.sessions[old_sid][0] < now: del self.sessions[old_sid]
 
 		cookie_value = f"{session.sid}.{self.__sign(session.sid)}"
 
