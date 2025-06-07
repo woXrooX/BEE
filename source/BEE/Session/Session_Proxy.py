@@ -1,24 +1,24 @@
 from contextvars import ContextVar
-from BEE.Session.Sessions import Sessions
+from .Sessions import Sessions
 
-__BEE_current_session = ContextVar("__BEE_current_session", default=None)
+current_session = ContextVar("BEE_current_session", default=None)
 
 class Session_Proxy:
 	########################### Static
 
 	# Bind *session* to the current context; return token for later reset.
 	@staticmethod
-	def bind(session: Session): return __BEE_current_session.set(session)
+	def bind(session: Sessions): return current_session.set(session)
 
 	# Reset the context to its previous state using *token*.
 	@staticmethod
-	def unbind(token): __BEE_current_session.reset(token)
+	def unbind(token): current_session.reset(token)
 
 	########### Helpers
 
 	@staticmethod
 	def __get():
-		__SP_session = __BEE_current_session.get()
+		__SP_session = current_session.get()
 		if __SP_session is None: raise RuntimeError("No active request context; 'session' unavailable")
 		return __SP_session
 
