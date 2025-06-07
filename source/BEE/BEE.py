@@ -3,8 +3,8 @@ from wsgiref.simple_server import make_server
 from .Router import Router
 from .Request import Request
 from .Response import Response
-from .Sessions.Session_Manager import Session_Manager
-from .Sessions.Session_Proxy import Session_Proxy
+from .Session.Session_Manager import Session_Manager
+from .Session.Session_Proxy import Session_Proxy
 
 class BEE:
 	# Back‑End Engine core object (WSGI‑callable + route registry).
@@ -47,7 +47,7 @@ class BEE:
 			# persist session if needed
 			self.sessions.save(session, response)
 
-			return resp(start_response)
+			return response(start_response)
 
 		finally: Session_Proxy.unbind(token)
 
