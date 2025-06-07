@@ -8,9 +8,9 @@ from .Session.Session_Proxy import Session_Proxy
 
 class BEE:
 	# Back‑End Engine core object (WSGI‑callable + route registry).
-	def __init__(self, SECRET_KEY="BEE_dev"):
+	def __init__(self, SECRET_KEY="BEE_dev", SQLite_DB_PATH = None):
 		self.router = Router()
-		self.sessions = Session_Manager(SECRET_KEY)
+		self.session_manager = Session_Manager(SECRET_KEY, SQLite_DB_PATH)
 
 	def route(self, path: str, methods=("GET",)):
 		def decorator(func):
@@ -21,7 +21,7 @@ class BEE:
 
 	def __call__(self, environ, start_response):
 		request = Request(environ)
-		session = self.sessions.load(environ)
+		session = self.session_manager.load(environ)
 		token = Session_Proxy.bind(session)
 
 		try:
@@ -45,7 +45,7 @@ class BEE:
 				else: response = Response.ok(result)
 
 			# persist session if needed
-			self.sessions.save(session, response)
+			self.session_manager.save(session, response)
 
 			return response(start_response)
 
