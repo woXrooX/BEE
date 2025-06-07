@@ -6,8 +6,9 @@ class Request:
 
 	########### APIs
 
-	def __init__(self, environ):
+	def __init__(self, environ, MAX_BODY_SIZE=None):
 		self.environ = environ
+		self.MAX_BODY_SIZE = MAX_BODY_SIZE
 		self.body = None
 		self.JSON = None
 		self.headers = None
@@ -49,7 +50,17 @@ class Request:
 			try: length = int(self.environ.get("CONTENT_LENGTH", 0) or 0)
 			except ValueError: length = 0
 
-			self.body = self.environ["wsgi.input"].read(length)
+			limit = self.MAX_BODY_SIZE
+			if limit is not None and length and length > limit:
+				raise RequestPayloadTooLarge()
+
+			if length: self.body = self.environ["wsgi.input"].read(length)
+
+			# Chunked / no Content-Length → defensive read
+			else:
+				chunk = self.environ["wsgi.input"].read((limit or 0) + 1)
+				if limit is not None and len(chunk) > limit: raise RequestPayloadTooLarge()
+				self.body = chunk
 
 		return self.body
 
