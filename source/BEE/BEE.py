@@ -8,9 +8,17 @@ from .Session.Session_Proxy import Session_Proxy
 
 class BEE:
 	# Back‑End Engine core object (WSGI‑callable + route registry).
-	def __init__(self, SECRET_KEY="BEE_dev", SQLite_DB_PATH = None):
+	def __init__(
+		self,
+		SECRET_KEY="BEE_dev",
+		SQLite_DB_PATH = None,
+
+		# 1 MB default
+		MAX_BODY_SIZE = 1 << 20
+	):
 		self.router = Router()
 		self.session_manager = Session_Manager(SECRET_KEY, SQLite_DB_PATH)
+		self.MAX_BODY_SIZE = MAX_BODY_SIZE
 
 	def route(self, path: str, methods=("GET",)):
 		def decorator(func):
@@ -20,7 +28,7 @@ class BEE:
 		return decorator
 
 	def __call__(self, environ, start_response):
-		request = Request(environ)
+		request = Request(environ, self.MAX_BODY_SIZE)
 		session = self.session_manager.load(environ)
 		token = Session_Proxy.bind(session)
 
@@ -48,6 +56,13 @@ class BEE:
 			self.session_manager.save(session, response)
 
 			return response(start_response)
+
+		except RequestPayloadTooLarge:
+			response = Response(
+				b"Request entity too large",
+				"413 REQUEST ENTITY TOO LARGE",
+				[("Content-Type", "text/plain")]
+			)
 
 		finally: Session_Proxy.unbind(token)
 
