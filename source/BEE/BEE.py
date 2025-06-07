@@ -8,9 +8,9 @@ from .Session.Session_Proxy import Session_Proxy
 
 class BEE:
 	# Back‑End Engine core object (WSGI‑callable + route registry).
-	def __init__(self, secret="BEE_dev"):
+	def __init__(self, SECRET_KEY="BEE_dev"):
 		self.router = Router()
-		self.sessions = Session_Manager(secret)
+		self.sessions = Session_Manager(SECRET_KEY)
 
 	def route(self, path: str, methods=("GET",)):
 		def decorator(func):
