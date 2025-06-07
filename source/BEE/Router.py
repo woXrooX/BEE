@@ -9,12 +9,12 @@ class Router:
 		# list of (method, compiled_regex, handler)
 		self.routes = []
 
-	def add(self, path_pattern: str, method: str, handler):
-		self.register_route(path_pattern, method, handler)
-
 	def register_route(self, path_pattern: str, method: str, handler):
 		regex = Router._compile(path_pattern)
 		self.routes.append((method.upper(), regex, handler))
+
+	def add(self, path_pattern: str, method: str, handler):
+		self.register_route(path_pattern, method, handler)
 
 	# Return *(handler, params_dict)* or *(None, None)* if no match.
 	def match(self, path: str, method: str):
