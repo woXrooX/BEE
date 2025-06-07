@@ -56,7 +56,7 @@ class Request:
 	# Parse body as JSON once and memoize result.
 	def get_JSON(self):
 		if self.JSON is None:
-			try: self.JSON = json.loads(self.body().decode() or "null")
+			try: self.JSON = json.loads(self.get_body().decode() or "null")
 			except json.JSONDecodeError: self.JSON = None
 
 		return self.JSON
