@@ -33,9 +33,6 @@ class BEE:
 		token = Session_Proxy.bind(session)
 
 		try:
-			# Enable if you want the session to be available on request as well
-			# request.session = session
-
 			handler, params = self.router.match(request.get_path(), request.get_method())
 			if handler is None: response = Response.not_found()
 			else:
