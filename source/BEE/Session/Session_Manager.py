@@ -11,7 +11,7 @@ THREADING_LOCK = threading.Lock()
 class Session_Manager:
 	########################### Static
 
-	COOKIE_NAME = "BEE_session"
+	COOKIE_NAME = "BEE_COOKIE_SESSION"
 
 	# 1 week in seconds
 	MAX_AGE = 60 * 60 * 24 * 7
@@ -24,7 +24,6 @@ class Session_Manager:
 		self.SECRET_KEY = SECRET_KEY
 		self.SQLite_DB_PATH = SQLite_DB_PATH or DEFAULT_DB_PATH
 
-		# Single connection in autocommit mode; shared across threads with a mutex
 		self.db = sqlite3.connect(
 			self.SQLite_DB_PATH,
 			check_same_thread=False,
@@ -52,21 +51,22 @@ class Session_Manager:
 
 		with THREADING_LOCK: row = self.db.execute("SELECT expires, data FROM sessions WHERE sid=?;", (sid,)).fetchone()
 
+		# No session in SQLite DB
 		if row is None: return Sessions()
 
-		expires, data_json = row
+		expires, data_JSON = row
 
-		# expired → purge & start fresh
+		# Expired. Purge & start fresh
 		if expires < time.time():
 			self.__SQLite_delete_session(sid)
 			return Sessions()
 
-		try: data = json.loads(data_json)
+		try: data = json.loads(data_JSON)
 		except json.JSONDecodeError: data = {}
 
 		return Sessions(data=data, new=False, sid=sid)
 
-	# Persist *session* and attach Set‑Cookie header if needed.
+	# Persist session and attach Set‑Cookie header if needed.
 	def save(self, session: Sessions, response):
 		if not (session.new or session.modified): return
 
@@ -74,30 +74,30 @@ class Session_Manager:
 		payload = json.dumps(dict(session))
 
 		with THREADING_LOCK:
-			self.db.execute("INSERT OR REPLACE INTO sessions(sid, expires, data) VALUES (?,?,?);", (session.sid, expires, payload),)
+			self.db.execute("INSERT OR REPLACE INTO BEE_sessions(sid, expires, data) VALUES (?,?,?);", (session.sid, expires, payload),)
 
 			# opportunistic GC
-			self.db.execute("DELETE FROM sessions WHERE expires < ?;", (int(time.time()),),)
+			self.db.execute("DELETE FROM BEE_sessions WHERE expires < ?;", (int(time.time()),),)
 
 		cookie_value = f"{session.sid}.{self.__sign(session.sid)}"
-		head_value = (
+
+		head_values = (
 			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly; "
 			f"Max-Age={Session_Manager.MAX_AGE}; SameSite=Lax; Secure"
 		)
 
-		response.headers.append(("Set-Cookie", head_value))
+		response.headers.append(("Set-Cookie", head_values))
 
 	########### Helpers
 	def __SQLite_init_session_schema(self):
 		with THREADING_LOCK:
-			self.db.execute("CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, expires INTEGER, data TEXT);")
-			self.db.execute("CREATE INDEX IF NOT EXISTS idx_expires ON sessions(expires);")
+			self.db.execute("CREATE TABLE IF NOT EXISTS BEE_sessions (sid TEXT PRIMARY KEY, expires INTEGER, data TEXT);")
+			self.db.execute("CREATE INDEX IF NOT EXISTS index_expires ON BEE_sessions(expires);")
 
 	def __SQLite_delete_session(self, sid: str):
-		with THREADING_LOCK: self.db.execute("DELETE FROM sessions WHERE sid=?;", (sid,))
+		with THREADING_LOCK: self.db.execute("DELETE FROM BEE_sessions WHERE sid=?;", (sid,))
 
-
-	# Return URL‑safe base64 HMAC(signature) for *sid*.
+	# Return URL‑safe base64 HMAC(signature) for sid.
 	def __sign(self, sid: str):
 		sig = hmac.new(self.SECRET_KEY.encode(), sid.encode(), hashlib.sha256).digest()
 		return base64.urlsafe_b64encode(sig).decode().rstrip("=")
