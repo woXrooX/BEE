@@ -1,6 +1,14 @@
 from urllib.parse import parse_qs
 import json
 
+
+########################### Exceptions
+
+# Raised when request.body exceeds MAX_BODY_SIZE.
+class BEE_ERROR_request_payload_too_large(Exception): pass
+
+
+
 class Request:
 	########################### Object
 
@@ -51,15 +59,15 @@ class Request:
 			except ValueError: length = 0
 
 			limit = self.MAX_BODY_SIZE
-			if limit is not None and length and length > limit:
-				raise RequestPayloadTooLarge()
+
+			if limit is not None and length and length > limit: raise BEE_ERROR_request_payload_too_large()
 
 			if length: self.body = self.environ["wsgi.input"].read(length)
 
 			# Chunked / no Content-Length → defensive read
 			else:
 				chunk = self.environ["wsgi.input"].read((limit or 0) + 1)
-				if limit is not None and len(chunk) > limit: raise RequestPayloadTooLarge()
+				if limit is not None and len(chunk) > limit: raise BEE_ERROR_request_payload_too_large()
 				self.body = chunk
 
 		return self.body
