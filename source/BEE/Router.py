@@ -16,7 +16,7 @@ class Router:
 	def add(self, path_pattern: str, method: str, handler):
 		self.register_route(path_pattern, method, handler)
 
-	# Return *(handler, params_dict)* or *(None, None)* if no match.
+	# Return (handler, params_dict) or (None, None) if no match.
 	def match(self, path: str, method: str):
 		for m, regex, handler in self.routes:
 			if m != method.upper(): continue
