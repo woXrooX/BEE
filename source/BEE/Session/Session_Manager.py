@@ -49,7 +49,7 @@ class Session_Manager:
 		# no valid cookie → new session
 		if not sid: return Sessions()
 
-		with THREADING_LOCK: row = self.db.execute("SELECT expires, data FROM sessions WHERE sid=?;", (sid,)).fetchone()
+		with THREADING_LOCK: row = self.db.execute("SELECT expires, data FROM BEE_sessions WHERE sid=?;", (sid,)).fetchone()
 
 		# No session in SQLite DB
 		if row is None: return Sessions()
