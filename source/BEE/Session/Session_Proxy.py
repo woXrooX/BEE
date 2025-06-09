@@ -1,5 +1,5 @@
 from contextvars import ContextVar
-from .Sessions import Sessions
+from .Session_Object import Session_Object
 
 CURRENT_SESSION = ContextVar("BEE_CURRENT_SESSION", default=None)
 
@@ -8,7 +8,7 @@ class Session_Proxy:
 
 	# Bind session to the current context; return token for later reset.
 	@staticmethod
-	def bind(session: Sessions): return CURRENT_SESSION.set(session)
+	def bind(session: Session_Object): return CURRENT_SESSION.set(session)
 
 	# Reset the context to its previous state using token.
 	@staticmethod

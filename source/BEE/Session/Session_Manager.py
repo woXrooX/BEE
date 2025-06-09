@@ -1,6 +1,6 @@
 import hmac, hashlib, base64, json, time, threading, sqlite3, os, sys
 
-from .Sessions import Sessions
+from .Session_Object import Session_Object
 
 # SQLite path
 BASE_DIR = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__))
@@ -32,7 +32,7 @@ class Session_Manager:
 
 		self.__SQLite_init_session_schema()
 
-	# Return a class "Sessions" extracted from the Cookie header.
+	# Return a class "Session_Object" extracted from the Cookie header.
 	def load(self, environ):
 		raw = environ.get("HTTP_COOKIE", "")
 		sid = None
@@ -47,27 +47,27 @@ class Session_Manager:
 				break
 
 		# no valid cookie → new session
-		if not sid: return Sessions()
+		if not sid: return Session_Object()
 
 		with THREADING_LOCK: row = self.db.execute("SELECT expires, data FROM BEE_sessions WHERE sid=?;", (sid,)).fetchone()
 
 		# No session in SQLite DB
-		if row is None: return Sessions()
+		if row is None: return Session_Object()
 
 		expires, data_JSON = row
 
 		# Expired. Purge & start fresh
 		if expires < time.time():
 			self.__SQLite_delete_session(sid)
-			return Sessions()
+			return Session_Object()
 
 		try: data = json.loads(data_JSON)
 		except json.JSONDecodeError: data = {}
 
-		return Sessions(data=data, new=False, sid=sid)
+		return Session_Object(data=data, new=False, sid=sid)
 
 	# Persist session and attach Set‑Cookie header if needed.
-	def save(self, session: Sessions, response):
+	def save(self, session: Session_Object, response):
 		if not (session.new or session.modified): return
 
 		expires = int(time.time()) + Session_Manager.MAX_AGE
