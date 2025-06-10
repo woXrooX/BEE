@@ -20,7 +20,7 @@ class BEE:
 		self.session_manager = Session_Manager(SECRET_KEY, SQLite_DB_PATH)
 		self.MAX_BODY_SIZE = MAX_BODY_SIZE
 
-	def route(self, path: str, methods=("GET",)):
+	def route(self, path, methods=("GET",)):
 		def decorator(func):
 			for method in methods: self.router.register_route(path, method.upper(), func)
 			return func
