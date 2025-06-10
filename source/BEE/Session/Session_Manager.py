@@ -1,5 +1,4 @@
 import hmac, hashlib, base64, json, time, threading
-
 from .Session_Object import Session_Object
 
 THREADING_LOCK = threading.Lock()
@@ -18,13 +17,12 @@ class Session_Manager:
 
 	def __init__(self, SECRET_KEY):
 		self.SECRET_KEY = SECRET_KEY
+		self.__store = {}
 
-	# Return a class "Session_Object" extracted from the Cookie header.
 	def load(self, environ):
-		raw = environ.get("HTTP_COOKIE", "")
 		sid = None
 
-		for part in raw.split(";"):
+		for part in environ.get("HTTP_COOKIE", "").split(";"):
 			if "=" not in part: continue
 
 			key, value = (p.strip() for p in part.split("=", 1))
@@ -33,35 +31,48 @@ class Session_Manager:
 				sid = self.__verify(value)
 				break
 
-		# no valid cookie → new session
 		if not sid: return Session_Object()
 
-		# For in-memory sessions, we don't need to check the database
-		return Session_Object(new=False, sid=sid)
+		with THREADING_LOCK: entry = self.__store.get(sid)
 
-	# Persist session and attach Set‑Cookie header if needed.
+		if entry is None: return Session_Object()
+
+		expires, data = entry
+
+		if expires < time.time():
+			with THREADING_LOCK: self.__store.pop(sid, None)
+			return Session_Object()
+
+		return Session_Object(data=data, new=False, sid=sid)
+
 	def save(self, session, response):
 		if not (session.new or session.modified): return
 
 		expires = int(time.time()) + Session_Manager.MAX_AGE
+		payload = dict(session)
+
+		with THREADING_LOCK:
+			self.__store[session.sid] = (expires, payload)
+
+			now = time.time()
+
+			for key, (exp, _) in list(self.__store.items()):
+				if exp < now: self.__store.pop(key, None)
 
 		cookie_value = f"{session.sid}.{self.__sign(session.sid)}"
 
-		head_values = (
-			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly;"
+		head_values   = (
+			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly; "
 			f"Max-Age={Session_Manager.MAX_AGE}; SameSite=Lax; Secure"
 		)
 
 		response.headers.append(("Set-Cookie", head_values))
 
 	########### Helpers
-
-	# Return URL‑safe base64 HMAC(signature) for sid.
 	def __sign(self, sid):
-		sig = hmac.new(self.SECRET_KEY.encode(), sid.encode(), hashlib.sha256).digest()
-		return base64.urlsafe_b64encode(sig).decode().rstrip("=")
+		raw = hmac.new(self.SECRET_KEY.encode(), sid.encode(), hashlib.sha256).digest()
+		return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
-	# Return sid if signature is valid, else None
 	def __verify(self, cookie_value):
 		try:
 			sid, sig = cookie_value.split(".", 1)
