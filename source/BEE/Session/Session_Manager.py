@@ -20,7 +20,7 @@ class Session_Manager:
 
 	########### APIs
 
-	def __init__(self, SECRET_KEY: str, SQLite_DB_PATH: str):
+	def __init__(self, SECRET_KEY, SQLite_DB_PATH):
 		self.SECRET_KEY = SECRET_KEY
 		self.SQLite_DB_PATH = SQLite_DB_PATH or DEFAULT_DB_PATH
 
@@ -40,10 +40,10 @@ class Session_Manager:
 		for part in raw.split(";"):
 			if "=" not in part: continue
 
-			k, v = (p.strip() for p in part.split("=", 1))
+			key, value = (p.strip() for p in part.split("=", 1))
 
-			if k == Session_Manager.COOKIE_NAME:
-				sid = self.__verify(v)
+			if key == Session_Manager.COOKIE_NAME:
+				sid = self.__verify(value)
 				break
 
 		# no valid cookie → new session
@@ -67,7 +67,7 @@ class Session_Manager:
 		return Session_Object(data=data, new=False, sid=sid)
 
 	# Persist session and attach Set‑Cookie header if needed.
-	def save(self, session: Session_Object, response):
+	def save(self, session, response):
 		if not (session.new or session.modified): return
 
 		expires = int(time.time()) + Session_Manager.MAX_AGE
@@ -82,7 +82,7 @@ class Session_Manager:
 		cookie_value = f"{session.sid}.{self.__sign(session.sid)}"
 
 		head_values = (
-			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly; "
+			f"{Session_Manager.COOKIE_NAME}={cookie_value}; Path=/; HttpOnly;"
 			f"Max-Age={Session_Manager.MAX_AGE}; SameSite=Lax; Secure"
 		)
 
@@ -94,16 +94,16 @@ class Session_Manager:
 			self.db.execute("CREATE TABLE IF NOT EXISTS BEE_sessions (sid TEXT PRIMARY KEY, expires INTEGER, data TEXT);")
 			self.db.execute("CREATE INDEX IF NOT EXISTS index_expires ON BEE_sessions(expires);")
 
-	def __SQLite_delete_session(self, sid: str):
+	def __SQLite_delete_session(self, sid):
 		with THREADING_LOCK: self.db.execute("DELETE FROM BEE_sessions WHERE sid=?;", (sid,))
 
 	# Return URL‑safe base64 HMAC(signature) for sid.
-	def __sign(self, sid: str):
+	def __sign(self, sid):
 		sig = hmac.new(self.SECRET_KEY.encode(), sid.encode(), hashlib.sha256).digest()
 		return base64.urlsafe_b64encode(sig).decode().rstrip("=")
 
 	# Return sid if signature is valid, else None
-	def __verify(self, cookie_value: str):
+	def __verify(self, cookie_value):
 		try:
 			sid, sig = cookie_value.split(".", 1)
 			return sid if hmac.compare_digest(self.__sign(sid), sig) else None
