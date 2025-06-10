@@ -5,7 +5,6 @@ Bee = BEE()
 @Bee.route("/")
 @Bee.route("/home")
 def home(request):
-	print(request.get_JSON())
 	return "Welcome to BEE!"
 
 @Bee.route("/user/<URL_param>", methods=["GET"])
