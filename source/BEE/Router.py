@@ -16,20 +16,20 @@ class Router:
 	def add(self, path_pattern, method, handler):
 		self.register_route(path_pattern, method, handler)
 
-	# Return (handler, params_dict) or (None, None) if no match.
+	# Returns (handler, params_dict) or (None, None) if no matches.
 	def match(self, path, method):
 		for m, regex, handler in self.routes:
 			if m != method.upper(): continue
 
-			match = regex.match(path)
+			matches = regex.match(path)
 
-			if match: return handler, match.groupdict()
+			if matches: return handler, matches.groupdict()
 
 		return None, None
 
 	########################### Static
 
-	param_re = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_]*)>")
+	__param_re = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_]*)>")
 
 	########### Helpers
 
@@ -40,6 +40,6 @@ class Router:
 			name = match.group(1)
 			return fr"(?P<{name}>[^/]+)"
 
-		regex_pattern = Router.param_re.sub(repl, pattern)
+		regex_pattern = Router.__param_re.sub(repl, pattern)
 		regex_pattern = f"^{regex_pattern}$"
 		return re.compile(regex_pattern)
