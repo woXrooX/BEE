@@ -20,13 +20,6 @@ class BEE:
 		self.session_manager = Session_Manager(SECRET_KEY, SQLite_DB_PATH)
 		self.MAX_BODY_SIZE = MAX_BODY_SIZE
 
-	def route(self, path, methods=("GET",)):
-		def decorator(func):
-			for method in methods: self.router.register_route(path, method.upper(), func)
-			return func
-
-		return decorator
-
 	def __call__(self, environ, start_response):
 		request = Request(environ, self.MAX_BODY_SIZE)
 		session = self.session_manager.load(environ)
@@ -80,3 +73,10 @@ class BEE:
 		with make_server(host, port, self) as server:
 			print(f"BEE running on http://{host}:{port}")
 			server.serve_forever()
+
+	def route(self, path, methods=("GET",)):
+		def decorator(func):
+			for method in methods: self.router.register_route(path, method.upper(), func)
+			return func
+
+		return decorator
