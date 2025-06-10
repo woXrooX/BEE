@@ -11,13 +11,12 @@ class BEE:
 	def __init__(
 		self,
 		SECRET_KEY="BEE_dev",
-		SQLite_DB_PATH = None,
 
 		# 1 MB default
 		MAX_BODY_SIZE = 1 << 20
 	):
 		self.router = Router()
-		self.session_manager = Session_Manager(SECRET_KEY, SQLite_DB_PATH)
+		self.session_manager = Session_Manager(SECRET_KEY)
 		self.MAX_BODY_SIZE = MAX_BODY_SIZE
 
 	def __call__(self, environ, start_response):
